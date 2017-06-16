@@ -127,7 +127,7 @@ static inline void		h_set_vars(FILE *f, Vector *vec, double &mass)
 
 	buf = new char[16];
 	r = fread((void*)buf, 1, 16, f);
-	check_error(r == 1, "Error reading from file");
+	check_error(r > 0, "Error reading from file");
 	vec->x = (double)(*(float*)(&buf[0]));
 	vec->y = (double)(*(float*)(&buf[4]));
 	vec->z = (double)(*(float*)(&buf[8]));
