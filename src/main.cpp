@@ -6,7 +6,7 @@ Render				*g_render;
 int					main(int argc, char *argv[])
 {
 	std::string		path;
-	if (argc < 4)
+	if (argc < 5)
 	{
 		std::cerr << "Usage: ./grav [prefix] [start frame] [end frame] [exclusion]\n";
 		std::cerr << "Example: ./grav big_data/multimass- 0 1199 1\n";

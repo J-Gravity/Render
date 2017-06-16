@@ -27,7 +27,7 @@ Render::Render(int w, int h, std::string path, int excl)
 	this->width = w;
 	this->height = h;
 	this->path = path;
-	this->scale = 200000000000000.0;
+	this->scale = 2000000000000000.0;
 	this->excl = excl;
 	check_error(!SDL_Init(SDL_INIT_EVERYTHING), "SDL Init error\n");
 	this->win = SDL_CreateWindow("J-Gravity", SDL_WINDOWPOS_UNDEFINED,
@@ -51,16 +51,6 @@ static inline long		h_read_long(FILE *f)
 
 	fread((void*)(&out), sizeof(out), 1, f);
 	return out;
-}
-
-static inline double	h_read_double(FILE *f)
-{
-	float			out;
-	size_t			r;
-
-	r = fread((void*)(&out), sizeof(out), 1, f);
-	check_error(r == 1, "Error reading from file");
-	return (double)out;
 }
 
 static int				h_digits(int i)
@@ -120,6 +110,28 @@ static inline void		h_put_pixel(int off, Color *c, t_thread *t)
 	}
 }
 
+static inline double	h_read_double(FILE *f)
+{
+	float			out;
+	size_t			r;
+
+	r = fread((void*)(&out), sizeof(out), 1, f);
+	check_error(r == 1, "Error reading from file");
+	return (double)out;
+}
+
+static inline void		h_set_vars(FILE *f, Vector *vec, double &mass)
+{
+	char				*buf;
+
+	buf = new char[16];
+	fread((void*)buf, 1, 16, f);
+	vec->x = (double)(*(float*)(&buf[0]));
+	vec->y = (double)(*(float*)(&buf[4]));
+	vec->z = (double)(*(float*)(&buf[8]));
+	mass = (double)(*(float*)(&buf[12]));
+}
+
 int						thread_func(void *tmp)
 {
 	t_thread			*t;
@@ -155,10 +167,7 @@ int						thread_func(void *tmp)
 				fseek(t->f, 16, SEEK_CUR);
 				continue;
 			}
-			vec->x = h_read_double(t->f);
-			vec->y = h_read_double(t->f);
-			vec->z = h_read_double(t->f);
-			mass = h_read_double(t->f);
+			h_set_vars(t->f, vec, mass);
 			index = mass * ccoef + ccons;
 			if (index >= csize)
 				index = csize - 1;
