@@ -123,9 +123,11 @@ static inline double	h_read_double(FILE *f)
 static inline void		h_set_vars(FILE *f, Vector *vec, double &mass)
 {
 	char				*buf;
+	size_t			r;
 
 	buf = new char[16];
-	fread((void*)buf, 1, 16, f);
+	r = fread((void*)buf, 1, 16, f);
+	check_error(r == 1, "Error reading from file");
 	vec->x = (double)(*(float*)(&buf[0]));
 	vec->y = (double)(*(float*)(&buf[4]));
 	vec->z = (double)(*(float*)(&buf[8]));
