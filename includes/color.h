@@ -27,6 +27,9 @@ public:
 	inline int					get_int();
 	static void					init_color_table(t_ctables type, int num);
 	static void					set_range(double min, double max);
+	static Color				*get_color_from_table(unsigned char r,
+		unsigned char g, unsigned char b);
+	static int					get_index(Color *c);
 	~Color();
 };
 

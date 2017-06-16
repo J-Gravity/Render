@@ -22,12 +22,13 @@ static inline void		check_error(ttype check, std::string message)
 	}
 }
 
-Render::Render(int w, int h, std::string path)
+Render::Render(int w, int h, std::string path, int excl)
 {
 	this->width = w;
 	this->height = h;
 	this->path = path;
-	this->scale = 2000000000000000.0;
+	this->scale = 200000000000000.0;
+	this->excl = excl;
 	check_error(!SDL_Init(SDL_INIT_EVERYTHING), "SDL Init error\n");
 	this->win = SDL_CreateWindow("J-Gravity", SDL_WINDOWPOS_UNDEFINED,
 		SDL_WINDOWPOS_UNDEFINED, w, h, SDL_WINDOW_SHOWN);
@@ -86,6 +87,39 @@ static int				h_digits(int i)
 	}
 }
 
+static inline unsigned char	h_avg(unsigned char a, unsigned char b)
+{
+	int						out;
+
+	out = (a + b) / 2;
+	return (unsigned char)out;
+}
+
+static inline void		h_put_pixel(int off, Color *c, t_thread *t)
+{
+	Color				*there;
+
+	if (t->pixels[off + 3])
+	{
+		check_error(there = Color::get_color_from_table(
+			t->pixels[off + 2],
+			t->pixels[off + 1],
+			t->pixels[off + 0]), "Color there not in table\n");
+		there = Color::table[(Color::get_index(c) + Color:: get_index(there)) / 2];
+		t->pixels[off + 0] = there->b;
+		t->pixels[off + 1] = there->g;
+		t->pixels[off + 2] = there->r;
+		t->pixels[off + 3] = SDL_ALPHA_OPAQUE;
+	}
+	else
+	{
+		t->pixels[off + 0] = c->b;
+		t->pixels[off + 1] = c->g;
+		t->pixels[off + 2] = c->r;
+		t->pixels[off + 3] = SDL_ALPHA_OPAQUE;
+	}
+}
+
 int						thread_func(void *tmp)
 {
 	t_thread			*t;
@@ -116,6 +150,11 @@ int						thread_func(void *tmp)
 		gcons = (double)width * (t->dad->scale * 1.5) / (t->dad->scale * 3.0);
 		for (long i = 0; i < t->count; i++)
 		{
+			if (t->dad->excl != 1 && i % t->dad->excl != 0)
+			{
+				fseek(t->f, 16, SEEK_CUR);
+				continue;
+			}
 			vec->x = h_read_double(t->f);
 			vec->y = h_read_double(t->f);
 			vec->z = h_read_double(t->f);
@@ -132,10 +171,7 @@ int						thread_func(void *tmp)
 			if (x >= 0 && x < width && y >= 0 && y < height)
 			{
 				off = (t->dad->width * 4 * y) + x * 4;
-				t->dad->pixels[off + 0] = c->b;
-				t->dad->pixels[off + 1] = c->g;
-				t->dad->pixels[off + 2] = c->r;
-				t->dad->pixels[off + 3] = SDL_ALPHA_OPAQUE;
+				h_put_pixel(off, c, t);
 			}
 		}
 		fclose(t->f);
@@ -170,6 +206,8 @@ void					Render::init_threading()
 		this->threads[i]->id = i;
 		this->threads[i]->dad = this;
 		name = "thread_id" + std::to_string(i);
+		this->threads[i]->pixels = std::vector<unsigned char>(
+			this->width * this->height * 4, 0);
 		SDL_CreateThread(thread_func, name.c_str(),
 			(void*)this->threads[i]);
 	}
@@ -191,31 +229,70 @@ void					Render::organize_threads(long par)
 	{
 		name = this->path + std::to_string(this->tick) + ".jgrav";
 		this->threads[i]->f = fopen(name.c_str(), "r");
+		std::fill(this->threads[i]->pixels.begin(), this->threads[i]->pixels.end(), 0);
 		fseek(this->threads[i]->f, cur, SEEK_SET);
-		if (i + 2 == this->num_threads)
+		if (i + 1 == this->num_threads)
 			each += mod;
 		this->threads[i]->count = each;
 		cur += each * 16;
 	}
 }
 
-void					Render::draw()
+void					Render::draw(bool first)
 {
 	FILE				*f;
 	std::string			name;
 	long				par;
+	bool				a, b, c, d;
 
 	name = this->path + std::to_string(this->tick) + ".jgrav";
 	f = fopen(name.c_str(), "rb");
 	SDL_SetRenderDrawColor(this->ren, 0, 0, 0, 0);
 	SDL_RenderClear(this->ren);
 	par = h_read_long(f);
+	// if (first)
+	// 	this->scale = 1000.0 * (double)h_read_long(f);
 	organize_threads(par);
 	fclose(f);
 	SDL_mutexP(this->mutex);
 	SDL_CondBroadcast(this->start_cond);
 	SDL_CondWait(this->done_cond, this->mutex);
 	SDL_mutexV(this->mutex);
+	a = false;
+	b = false;
+	c = false;
+	d = false;
+	for (int off = 0; off < this->pixels.size(); off++)
+	{
+		if (off % 4 == 0)
+		{
+			a = (this->threads[0]->pixels[off + 0] == 0 &&
+				this->threads[0]->pixels[off + 1] == 0 &&
+				this->threads[0]->pixels[off + 2] == 0 &&
+				this->threads[0]->pixels[off + 3] == 0);
+			b = (this->threads[1]->pixels[off + 0] == 0 &&
+				this->threads[1]->pixels[off + 1] == 0 &&
+				this->threads[1]->pixels[off + 2] == 0 &&
+				this->threads[1]->pixels[off + 3] == 0);
+			c = (this->threads[2]->pixels[off + 0] == 0 &&
+				this->threads[2]->pixels[off + 1] == 0 &&
+				this->threads[2]->pixels[off + 2] == 0 &&
+				this->threads[2]->pixels[off + 3] == 0);
+			d = (this->threads[3]->pixels[off + 0] == 0 &&
+				this->threads[3]->pixels[off + 1] == 0 &&
+				this->threads[3]->pixels[off + 2] == 0 &&
+				this->threads[3]->pixels[off + 3] == 0);
+		}
+		if (!a || !b || !c || !d)
+		{
+			this->pixels[off] = (
+					(a ? 0 : (int)this->threads[0]->pixels[off]) +
+					(b ? 0 : (int)this->threads[1]->pixels[off]) +
+					(c ? 0 : (int)this->threads[2]->pixels[off]) +
+					(d ? 0 : (int)this->threads[3]->pixels[off])
+				) / (4 - ((int)a + (int)b + (int)c + (int)d));
+		}
+	}
 	SDL_UpdateTexture(this->tex, NULL, &this->pixels[0], this->width * 4);
 	SDL_RenderCopy(this->ren, this->tex, NULL, NULL);
 	SDL_RenderPresent(this->ren);
@@ -255,6 +332,7 @@ void					Render::loop(long start, long end)
 	bool				running;
 	bool				paused;
 	bool				updated;
+	bool				first;
 	int					dir;
 	SDL_Event			event;
 
@@ -263,6 +341,7 @@ void					Render::loop(long start, long end)
 	paused = 1;
 	updated = 0;
 	dir = 1;
+	first = true;
 	while (running)
 	{
 		if (!paused)
@@ -284,7 +363,13 @@ void					Render::loop(long start, long end)
 		}
 		if (!updated)
 		{
-			this->draw();
+			if (first)
+			{
+				this->draw(true);
+				first = false;
+			}
+			else
+				this->draw();
 			updated = 1;
 		}
 		while (SDL_PollEvent(&event))

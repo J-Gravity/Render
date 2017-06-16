@@ -97,6 +97,33 @@ void				Color::set_range(double min, double max)
 	Color::max_mass = max;
 }
 
+Color				*Color::get_color_from_table(unsigned char r,
+	unsigned char g, unsigned char b)
+{
+	Color			*out;
+
+	out = 0;
+	for (int i = 0; i < Color::size; i++)
+	{
+		if (Color::table[i]->r == r && Color::table[i]->g == g &&
+			Color::table[i]->b == b)
+		{
+			out = Color::table[i];
+			break;
+		}
+	}
+	return (out);
+}
+
+int					Color::get_index(Color *c)
+{
+	for (int i = 0; i < Color::size; i++)
+		if (Color::table[i]->r == c->r && Color::table[i]->g == c->g &&
+			Color::table[i]->b == c->b)
+			return i;
+	return 0;
+}
+
 Color::~Color()
 {
 }
