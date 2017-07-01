@@ -11,6 +11,8 @@
 # include <SDL.h>
 # include <SDL_thread.h>
 # include <vector>
+# include <string>
+# include <map>
 
 # include "color.h"
 # include "vector.h"

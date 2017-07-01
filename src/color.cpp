@@ -86,7 +86,7 @@ void				Color::init_color_table(t_ctables type, int num)
 			g = (sin(f) + 1.0) * 127.0;
 			b = (cos(f) + 1.0) * 127.0;
 			Color::table[i] = new Color(r, g, b);
-			f += (float)M_PI / (float)num;
+			f += 1.6 * (float)M_PI / (float)num;
 		}
 	}
 }
@@ -117,6 +117,8 @@ Color				*Color::get_color_from_table(unsigned char r,
 
 int					Color::get_index(Color *c)
 {
+	if (c == 0)
+		return -1;
 	for (int i = 0; i < Color::size; i++)
 		if (Color::table[i]->r == c->r && Color::table[i]->g == c->g &&
 			Color::table[i]->b == c->b)

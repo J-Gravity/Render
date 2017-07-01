@@ -12,7 +12,7 @@ typedef struct					s_thread
 	FILE						*f; // Already at the correct cursor location
 	long						count; // In number of particles
 	Render						*dad;
-	std::vector<unsigned char>	pixels;
+	std::vector<unsigned char>	compix;
 }								t_thread;
 
 class				Render
@@ -25,7 +25,8 @@ public:
 	Camera						*cam;
 	long						tick;
 	double						scale;
-	std::string					path;
+	std::string					in_path;
+	std::string					out_path;
 	Uint8						*keystate;
 	SDL_mutex					*mutex;
 	SDL_cond					*start_cond;
@@ -35,16 +36,23 @@ public:
 	int							excl;
 	SDL_Texture					*tex;
 	std::vector<unsigned char>	pixels;
+	std::vector<unsigned char>	compix;
 
-	Render(int w = 640, int h = 480, std::string path = "data/test-", int excl = 1);
+	Render(int w = 640, int h = 480, std::string in = "data/test-",
+		std::string out = "output/o-", int excl = 1);
 	void						draw(bool first = false);
 	void						loop(long start, long end);
+	void						make_gif(std::string path = "out.gif");
 	void						wait_for_death();
 	~Render();
 
 private:
 	std::vector<t_thread*>		threads;
+	long						start_tick;
+	long						end_tick;
 
+	void						make_header(FILE *f);
+	void						make_frame(FILE *f, long tick);
 	void						init_threading();
 	void						organize_threads(long par);
 };

@@ -22,11 +22,12 @@ static inline void		check_error(ttype check, std::string message)
 	}
 }
 
-Render::Render(int w, int h, std::string path, int excl)
+Render::Render(int w, int h, std::string in, std::string out, int excl)
 {
 	this->width = w;
 	this->height = h;
-	this->path = path;
+	this->in_path = in;
+	this->out_path = out;
 	this->scale = 2000000000000000.0;
 	this->excl = excl;
 	check_error(!SDL_Init(SDL_INIT_EVERYTHING), "SDL Init error\n");
@@ -41,7 +42,7 @@ Render::Render(int w, int h, std::string path, int excl)
 		60, 1000.0, 500000.0);
 	this->tick = 0;
 	Color::set_range(1.0, 4.0);
-	Color::init_color_table(RAINBOW, 128);
+	Color::init_color_table(RAINBOW, 255);
 	init_threading();
 }
 
@@ -85,31 +86,6 @@ static inline unsigned char	h_avg(unsigned char a, unsigned char b)
 	return (unsigned char)out;
 }
 
-static inline void		h_put_pixel(int off, Color *c, t_thread *t)
-{
-	Color				*there;
-
-	if (t->pixels[off + 3])
-	{
-		check_error(there = Color::get_color_from_table(
-			t->pixels[off + 2],
-			t->pixels[off + 1],
-			t->pixels[off + 0]), "Color there not in table\n");
-		there = Color::table[(Color::get_index(c) + Color:: get_index(there)) / 2];
-		t->pixels[off + 0] = there->b;
-		t->pixels[off + 1] = there->g;
-		t->pixels[off + 2] = there->r;
-		t->pixels[off + 3] = SDL_ALPHA_OPAQUE;
-	}
-	else
-	{
-		t->pixels[off + 0] = c->b;
-		t->pixels[off + 1] = c->g;
-		t->pixels[off + 2] = c->r;
-		t->pixels[off + 3] = SDL_ALPHA_OPAQUE;
-	}
-}
-
 static inline double	h_read_double(FILE *f)
 {
 	float			out;
@@ -139,7 +115,6 @@ int						thread_func(void *tmp)
 	t_thread			*t;
 	int					dif;
 	Vector				*vec;
-	Color				*c;
 	double				mass;
 	int					x, y, off;
 	int					width, height, index;
@@ -175,14 +150,14 @@ int						thread_func(void *tmp)
 				index = csize - 1;
 			else if (index < 0)
 				index = 0;
-			c = Color::table[index];
 			t->dad->cam->watch_vector(vec);
 			x = gcoef * vec->x + gcons;
 			y = gcoef * vec->y + gcons - dif;
 			if (x >= 0 && x < width && y >= 0 && y < height)
 			{
-				off = (t->dad->width * 4 * y) + x * 4;
-				h_put_pixel(off, c, t);
+				off = t->dad->width * y + x;
+				if (t->compix[off] < index + 1)
+					t->compix[off] = index + 1;
 			}
 		}
 		fclose(t->f);
@@ -211,14 +186,15 @@ void					Render::init_threading()
 		this->width, this->height);
 	this->pixels = std::vector<unsigned char>(this->width * this->height * 4,
 		0);
+	this->compix = std::vector<unsigned char>(this->width * this->height, 0);
 	for (int i = 0; i < this->num_threads; i++)
 	{
 		this->threads[i] = new t_thread;
 		this->threads[i]->id = i;
 		this->threads[i]->dad = this;
 		name = "thread_id" + std::to_string(i);
-		this->threads[i]->pixels = std::vector<unsigned char>(
-			this->width * this->height * 4, 0);
+		this->threads[i]->compix = std::vector<unsigned char>(
+			this->width * this->height, 0);
 		SDL_CreateThread(thread_func, name.c_str(),
 			(void*)this->threads[i]);
 	}
@@ -236,11 +212,12 @@ void					Render::organize_threads(long par)
 	mod = par % this->num_threads;
 	this->running_threads = this->num_threads;
 	std::fill(this->pixels.begin(), this->pixels.end(), 0);
+	std::fill(this->compix.begin(), this->compix.end(), 0);
 	for (int i = 0; i < this->num_threads; i++)
 	{
-		name = this->path + std::to_string(this->tick) + ".jgrav";
+		name = this->in_path + std::to_string(this->tick) + ".jgrav";
 		this->threads[i]->f = fopen(name.c_str(), "r");
-		std::fill(this->threads[i]->pixels.begin(), this->threads[i]->pixels.end(), 0);
+		std::fill(this->threads[i]->compix.begin(), this->threads[i]->compix.end(), 0);
 		fseek(this->threads[i]->f, cur, SEEK_SET);
 		if (i + 1 == this->num_threads)
 			each += mod;
@@ -251,61 +228,58 @@ void					Render::organize_threads(long par)
 
 void					Render::draw(bool first)
 {
-	FILE				*f;
+	FILE				*fin;
+	FILE				*fout;
 	std::string			name;
 	long				par;
-	bool				a, b, c, d;
+	int					a, b, c, d;
+	Color				*color;
+	int					max;
 
-	name = this->path + std::to_string(this->tick) + ".jgrav";
-	f = fopen(name.c_str(), "rb");
+	name = this->in_path + std::to_string(this->tick) + ".jgrav";
+	fin = fopen(name.c_str(), "rb");
 	SDL_SetRenderDrawColor(this->ren, 0, 0, 0, 0);
 	SDL_RenderClear(this->ren);
-	par = h_read_long(f);
+	par = h_read_long(fin);
 	// if (first)
-	// 	this->scale = 1000.0 * (double)h_read_long(f);
+	// 	this->scale = 1000.0 * (double)h_read_long(fin);
 	organize_threads(par);
-	fclose(f);
+	fclose(fin);
 	SDL_mutexP(this->mutex);
 	SDL_CondBroadcast(this->start_cond);
 	SDL_CondWait(this->done_cond, this->mutex);
 	SDL_mutexV(this->mutex);
-	a = false;
-	b = false;
-	c = false;
-	d = false;
-	for (int off = 0; off < this->pixels.size(); off++)
+	a = 0;
+	b = 0;
+	c = 0;
+	d = 0;
+	for (int off = 0; off < this->pixels.size(); off += 4)
 	{
-		if (off % 4 == 0)
+		a = this->threads[0]->compix[off / 4];
+		max = a;
+		b = this->threads[1]->compix[off / 4];
+		max = b > max ? b : max;
+		c = this->threads[2]->compix[off / 4];
+		max = c > max ? c : max;
+		d = this->threads[3]->compix[off / 4];
+		max = d > max ? d : max;
+		if (max > 0)
 		{
-			a = (this->threads[0]->pixels[off + 0] == 0 &&
-				this->threads[0]->pixels[off + 1] == 0 &&
-				this->threads[0]->pixels[off + 2] == 0 &&
-				this->threads[0]->pixels[off + 3] == 0);
-			b = (this->threads[1]->pixels[off + 0] == 0 &&
-				this->threads[1]->pixels[off + 1] == 0 &&
-				this->threads[1]->pixels[off + 2] == 0 &&
-				this->threads[1]->pixels[off + 3] == 0);
-			c = (this->threads[2]->pixels[off + 0] == 0 &&
-				this->threads[2]->pixels[off + 1] == 0 &&
-				this->threads[2]->pixels[off + 2] == 0 &&
-				this->threads[2]->pixels[off + 3] == 0);
-			d = (this->threads[3]->pixels[off + 0] == 0 &&
-				this->threads[3]->pixels[off + 1] == 0 &&
-				this->threads[3]->pixels[off + 2] == 0 &&
-				this->threads[3]->pixels[off + 3] == 0);
-		}
-		if (!a || !b || !c || !d)
-		{
-			this->pixels[off] = (
-					(a ? 0 : (int)this->threads[0]->pixels[off]) +
-					(b ? 0 : (int)this->threads[1]->pixels[off]) +
-					(c ? 0 : (int)this->threads[2]->pixels[off]) +
-					(d ? 0 : (int)this->threads[3]->pixels[off])
-				) / (4 - ((int)a + (int)b + (int)c + (int)d));
+			color = Color::table[max - 1];
+			this->pixels[off + 0] = color->b;
+			this->pixels[off + 1] = color->g;
+			this->pixels[off + 2] = color->r;
+			this->pixels[off + 3] = SDL_ALPHA_OPAQUE;
+			this->compix[off / 4] = max;
 		}
 	}
 	SDL_UpdateTexture(this->tex, NULL, &this->pixels[0], this->width * 4);
 	SDL_RenderCopy(this->ren, this->tex, NULL, NULL);
+	name = this->out_path + std::to_string(this->tick) + ".jgpix";
+	fout = fopen(name.c_str(), "w");
+	fwrite((const char*)&this->compix[0], this->compix.size(),
+		sizeof(char), fout);
+	fclose(fout);
 	SDL_RenderPresent(this->ren);
 }
 
@@ -348,6 +322,7 @@ void					Render::loop(long start, long end)
 	SDL_Event			event;
 
 	this->tick = start;
+	this->start_tick = start;
 	running = 1;
 	paused = 1;
 	updated = 0;
@@ -432,6 +407,200 @@ void					Render::loop(long start, long end)
 		this->keystate = (Uint8*)SDL_GetKeyboardState(NULL);
 		h_update_from_input(this, &updated);
 	}
+	this->end_tick = this->tick;
+}
+
+void					Render::make_header(FILE *f)
+{
+	char head[] = {'G', 'I', 'F', '8', '9', 'a'};
+	fwrite(head, sizeof(char), sizeof(head), f);
+	Uint8 logical_sd[] = {
+		this->width,
+		this->width >> 8,
+		this->height,
+		this->height >> 8,
+		0xF7,
+		0x0, // Background index 1
+		0x0 // Pixel aspect ratio
+	};
+	fwrite(logical_sd, sizeof(char), sizeof(logical_sd), f);
+	char colors[3 * 256];
+	for (int i = 1; i < 256; i++)
+	{
+		colors[3 * i + 0] = Color::table[i - 1]->r;
+		colors[3 * i + 1] = Color::table[i - 1]->g;
+		colors[3 * i + 2] = Color::table[i - 1]->b;
+	}
+	fwrite(colors, sizeof(char), sizeof(colors), f);
+	fwrite("\x21\xff\x0bNETSCAPE2.0\x03\x01\x0\x0\0", 1, 19, f);
+}
+
+static unsigned char	*pack(std::vector<int> vec, int *len)
+{
+	unsigned char		*cur; // Current byte in data
+	unsigned char		*out; // Location of data
+	int					bits; // How many bits each number has
+	int					obit; // How many bits have been put in byte
+	int					ibit; // How many bits have been taken from number
+	int					to_place; // Stores how many bits we are about to place
+	unsigned char		masks[9] = {0, 1, 3, 7, 15, 31, 63, 127, 255};
+
+	bits = 9;
+	obit = 0;
+	*len = 1;
+	out = new unsigned char[vec.size() * 4]; // Allocate for worst case scenario
+	*out = 0; // We are using |= so it needs to be zeroed
+	cur = out;
+	for (int i = 0; i < vec.size(); ++i) // Iterate through all numbers
+	{
+		ibit = 0;
+		if (vec[i] == -1)
+			bits++;
+		else
+		{
+			while (ibit < bits)
+			{
+				to_place = ( (bits - ibit) < (8 - obit) ) ?
+					(bits - ibit) : (8 - obit);
+				*cur |= ( (vec[i] >> ibit) & masks[to_place] ) << obit;
+				obit += to_place;
+				ibit += to_place;
+				if (obit > 7)
+				{
+					obit = 0;
+					cur++;
+					*cur = 0;
+					(*len)++;
+				}
+			}
+			if (vec[i] == 256)
+				bits = 9;
+		}
+	}
+	out[*len] = 0;
+	return out;
+}
+
+static unsigned char	*encode(std::string &codee, int *len)
+{
+	int					dict_size = 258;
+	int					bits = 9;
+	std::map<std::string, int> dictionary;
+	std::string			w;
+	std::vector<int>	vec;
+
+	for (int i = 0; i < 256; i++)
+		dictionary[std::string(1, i)] = i;
+	vec.push_back(256);
+	for (std::string::const_iterator it = codee.begin();
+		it != codee.end(); ++it)
+	{
+		char c = *it;
+		std::string wc = w + c;
+		if (dictionary.count(wc))
+			w = wc;
+		else
+		{
+			vec.push_back(dictionary[w]);
+			dictionary[wc] = dict_size++;
+			if ((dict_size - 1) >> bits != 0 && dict_size < 4095)
+			{
+				bits++;
+				vec.push_back(-1);
+			}
+			if (dict_size >= 4096)
+			{
+				dictionary.clear();
+				for (int i = 0; i < 256; i++)
+					dictionary[std::string(1, i)] = i;
+				dict_size = 258;
+				vec.push_back(256);
+				bits = 9;
+			}
+			w = std::string(1, c);
+		}
+	}
+	if (!w.empty())
+	{
+		vec.push_back(dictionary[w]);
+	}
+	return pack(vec, len);
+}
+
+void					Render::make_frame(FILE *f, long tick)
+{
+	FILE				*in;
+	std::string			name;
+	char				*read_val;
+	char				*pack;
+	int					len;
+	int					num_blocks;
+	int					i;
+	unsigned char		block_mod;
+
+	Uint8 flags[] = {
+		0x21,
+		0xF9,
+		0x04,
+		0x04,
+		0x04, // Frame length byte
+		0x00, // And this one goes before it
+		0x00, // No transparency
+		0x00, // End of block
+		0x2c, // We coloring now
+		0x0,
+		0x0,
+		0x0,
+		0x0,
+		this->width,
+		this->width >> 8,
+		this->height,
+		this->height >> 8,
+		0x0, // No local color table, use global one
+		0x08
+	};
+	fwrite(flags, sizeof(Uint8), sizeof(flags), f);
+	name = this->out_path + std::to_string(tick) + ".jgpix";
+	in = fopen(name.c_str(), "r");
+	read_val = new char[this->width * this->height + 1];
+	read_val[this->width * this->height] = 0;
+	fread(read_val, sizeof(char), this->width * this->height, in);
+	std::string			contents(read_val, this->width * this->height);
+	delete read_val;
+	pack = (char*)encode(contents, &len);
+	num_blocks = (len) / 255;
+	block_mod = (len) % 255;
+	for (i = 0; i < num_blocks; ++i)
+	{
+		fwrite("\xff", 1, 1, f);
+		fwrite(&(pack[i * 255]), 1, 255, f);
+	}
+	if (block_mod > 0)
+	{
+		fwrite(&block_mod, 1, 1, f);
+		fwrite(&pack[i * 255], 1, block_mod, f);
+	}
+	fwrite("\x0", 1, 1, f);
+	fclose(in);
+	remove(name.c_str());
+	delete pack;
+}
+
+void					Render::make_gif(std::string path)
+{
+	FILE				*f;
+
+	f = fopen(path.c_str(), "w");
+	this->make_header(f);
+	if (this->start_tick >= 0 && this->end_tick > this->start_tick)
+	{
+		for (int i = this->start_tick; i <= this->end_tick; i++)
+		{
+			this->make_frame(f, i);
+		}
+	}
+	fwrite("\x3b", 1, 1, f);
+	fclose(f);
 }
 
 void					Render::wait_for_death()

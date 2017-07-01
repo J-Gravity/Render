@@ -13,8 +13,8 @@ int					main(int argc, char *argv[])
 		return 0;
 	}
 	path = argv[1];
-	g_render = new Render(1600, 1200, path, atoi(argv[4]));
+	g_render = new Render(1600, 1200, path, "output/o-", atoi(argv[4]));
 	g_render->loop(atoi(argv[2]), atoi(argv[3]));
-	g_render->wait_for_death();
+	g_render->make_gif("out.gif");
 	return (0);
 }
