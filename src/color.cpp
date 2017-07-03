@@ -79,14 +79,23 @@ void				Color::init_color_table(t_ctables type, int num)
 	Color::table = std::vector<Color*>(num);
 	if (type == RAINBOW)
 	{
-		f = 0;
-		for (int i = 0; i < num; ++i)
+		f = (float)M_PI;
+		for (int i = 0; i < num / 2; ++i)
 		{
 			r = (-cos(f) + 1.0) * 127.0;
 			g = (sin(f) + 1.0) * 127.0;
 			b = (cos(f) + 1.0) * 127.0;
 			Color::table[i] = new Color(r, g, b);
-			f += 1.6 * (float)M_PI / (float)num;
+			f += 1.2 * (float)M_PI / (float)num;
+		}
+		f = 0;
+		for (int i = num / 2; i < num; ++i)
+		{
+			r = (-cos(f) + 1.0) * 127.0;
+			g = (sin(f) + 1.0) * 127.0;
+			b = (cos(f) + 1.0) * 127.0;
+			Color::table[i] = new Color(r, g, b);
+			f += 1.2 * (float)M_PI / (float)num;
 		}
 	}
 }

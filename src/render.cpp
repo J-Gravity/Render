@@ -41,7 +41,7 @@ Render::Render(int w, int h, std::string in, std::string out, int excl)
 		new Vector(0, 0, 0.0), new Matrix(ROTATION, 0.0, 0.0, 0.0),
 		60, 1000.0, 500000.0);
 	this->tick = 0;
-	Color::set_range(1.0, 4.0);
+	Color::set_range(-4.0, 4.0);
 	Color::init_color_table(RAINBOW, 255);
 	init_threading();
 }
@@ -108,6 +108,7 @@ static inline void		h_set_vars(FILE *f, Vector *vec, double &mass)
 	vec->y = (double)(*(float*)(&buf[4]));
 	vec->z = (double)(*(float*)(&buf[8]));
 	mass = (double)(*(float*)(&buf[12]));
+	delete buf;
 }
 
 int						thread_func(void *tmp)
