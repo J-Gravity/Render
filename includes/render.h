@@ -37,6 +37,7 @@ public:
 	SDL_Texture					*tex;
 	std::vector<unsigned char>	pixels;
 	std::vector<unsigned char>	compix;
+	bool						to_gif;
 
 	Render(int w = 640, int h = 480, std::string in = "data/test-",
 		std::string out = "output/o-", int excl = 1);

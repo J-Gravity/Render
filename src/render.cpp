@@ -78,9 +78,9 @@ static int				h_digits(int i)
 	}
 }
 
-static inline unsigned char	h_avg(unsigned char a, unsigned char b)
+static inline unsigned char		h_avg(unsigned char a, unsigned char b)
 {
-	int						out;
+	int					out;
 
 	out = (a + b) / 2;
 	return (unsigned char)out;
@@ -276,11 +276,14 @@ void					Render::draw(bool first)
 	}
 	SDL_UpdateTexture(this->tex, NULL, &this->pixels[0], this->width * 4);
 	SDL_RenderCopy(this->ren, this->tex, NULL, NULL);
-	name = this->out_path + std::to_string(this->tick) + ".jgpix";
-	fout = fopen(name.c_str(), "w");
-	fwrite((const char*)&this->compix[0], this->compix.size(),
-		sizeof(char), fout);
-	fclose(fout);
+	if (this->to_gif)
+	{
+		name = this->out_path + std::to_string(this->tick) + ".jgpix";
+		fout = fopen(name.c_str(), "w");
+		fwrite((const char*)&this->compix[0], this->compix.size(),
+			sizeof(char), fout);
+		fclose(fout);
+	}
 	SDL_RenderPresent(this->ren);
 }
 
