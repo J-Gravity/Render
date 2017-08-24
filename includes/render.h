@@ -3,6 +3,12 @@
 # define RENDER_H
 
 # include "engine.h"
+# include <cstdlib>
+# include <fcntl.h>
+# include <unistd.h>
+# include <stdio.h>
+
+# define FRAME_COUNT 36
 
 class				Render;
 
@@ -56,6 +62,10 @@ private:
 	void						make_frame(FILE *f, long tick);
 	void						init_threading();
 	void						organize_threads(long par);
+	
+	//my shit
+	void						draw(size_t size, float *bodies);
+	float						*getBodies(int fd, size_t size);
 };
 
 #endif

@@ -227,6 +227,58 @@ void					Render::organize_threads(long par)
 	}
 }
 
+
+float					*getBodies(int fd, size_t size, float *ret)
+{
+	if ((size * sizeof(float) * 4) != read(fd, ret, sizeof(float) * size * 4)
+		dprintf(2, "Danger Will Robinson");)
+	return (ret);
+}
+
+//the real draw of this file. hon hon hon.
+void					Render::draw(size_t size, float *bodies)
+{
+	//grab our bodies, the long at the beginning is already filtered out.
+	size_t			i = 0;
+	
+	SDL_Init(SDL_INIT_VIDEO);
+	SDL_SetVideoMode(720, 640, 32, SDL_OPENGL);
+	//no idea what these do aside from setting which matrix I'm using but I know I'm supposed to use them
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	//aspect ratio stuff
+	gluPerspective(70, (double)640/480, 1, 1000);
+	
+	glPushAttrib(GL_ALL_ATTRIB_BITS); //save the state of the OpenGL stuff
+	glPushMatrix();
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	
+	gluLookAt(3, 4, 2, 0, 0, 0, 0, 0, 1); //3d math stuff
+	glPointSize(3.0); //diameter of our points.
+	glBegin(GL_POINTS); //treat all our vertexes as single points.
+	//this works because 64 bits is really really big. Also like realistically speaking I'd be surprised if we broke 1 billion bodies, considering we are only rendering the centers of gravity of the tree's leaves.
+	size = size * 4;
+	while (i < size)
+	{
+		//I don't know how to scale colors.
+		glColor3ub((bodies[i + 3] % 255, bodies[i + 3] % 255, bodies[i + 3] % 255);
+		//and then put the bodies in as points
+		glVertex3d(bodies[i + 0], bodies[i + 1], bodies[i + 2]);
+		i += 4;
+	}
+	glEnd(); //this be straight magic
+	glFlush();
+	SDL_GL_SwapBuffers();
+	
+	glPopMatrix();
+	glPopAttrib();
+	//we don't need to free our bodies here because we are just going to overwrite it next time.
+}
+
+
+//Pablo doesn't bother commenting his code so I'm just going to overload draw and do something simpler while preserving his code in case we need something from it.
 void					Render::draw(bool first)
 {
 	FILE				*fin;
@@ -324,6 +376,10 @@ void					Render::loop(long start, long end)
 	bool				first;
 	int					dir;
 	SDL_Event			event;
+	size_t				size = 0;
+	int					fd;
+	std::string			name;
+	float				**bodies;
 
 	this->tick = start;
 	this->start_tick = start;
@@ -353,13 +409,38 @@ void					Render::loop(long start, long end)
 		}
 		if (!updated)
 		{
+			name = this->in_path + std::to_string(this->tick) + ".jgrav";
+			fd = open(name.c_str, O_RDONLY);
+			read(fd, &size, sizeof(long));
 			if (first)
 			{
-				this->draw(true);
-				first = false;
+				//initialize our frames and populate them. Improve this by doing the populating and the rendering in different threads.
+				//Ideally we would populate up to x frames and then start rendering, with the rendering pausing if we outpace the population. We should render multiple frames of the simulation intot the future. There should be a way to set a framerate as well.
+				//doing it this way makes a lot of sense if you actually think about what malloc does
+				bodies = malloc(sizeof(float*) * FRAME_COUNT);
+				for (size_t j = 0; j < FRAME_COUNT; j++)
+				{
+					bodies[j] = malloc(sizeof(float) * size * 4);
+					bodies[j] = getBodies(fd, size, bodies[j]);
+				}
+				for (size_t j = 0; j < FRAME_COUNT; j++)
+				{
+					this->draw(size, bodies[j]);
+					first = false;
+				}
 			}
 			else
-				this->draw();
+			{
+				for (size_t j = 0; j < FRAME_COUNT; j++)
+				{
+					bodies[j] = getbodies(fd, size, bodies[j]);
+				}
+				for (size_t j = 0; j < FRAME_COUNT; j++)
+				{
+					this->draw(size, bodies[j]);
+				}
+			}
+			close(fd);
 			updated = 1;
 		}
 		while (SDL_PollEvent(&event))
