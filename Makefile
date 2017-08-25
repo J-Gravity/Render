@@ -1,12 +1,12 @@
 
 NAME	= grav
 
-SRC		= vector.cpp matrix.cpp camera.cpp main.cpp color.cpp render.cpp
+SRC		= main.cpp render.cpp
 OBJ		= $(addprefix $(OBJDIR),$(SRC:.cpp=.o))
 
 CC		= clang++
-CGLAGS	= -O3 -I ./frameworks/SDL2.framework/Headers/
-LDFLAGS	= -Wl -rpath ./frameworks/ -F ./frameworks/ -framework SDL2
+CGLAGS	= -std=c++11 -O3 -I /frameworks/SDL2.framework/Headers/ -I /usr/include/SDL2/
+LDFLAGS	= -I usr/include/SDL2/
 
 SRCDIR	= ./src/
 INCDIR	= ./includes/

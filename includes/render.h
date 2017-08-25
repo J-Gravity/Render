@@ -65,7 +65,7 @@ private:
 	
 	//my shit
 	void						draw(size_t size, float *bodies);
-	float						*getBodies(int fd, size_t size);
+	float						*getBodies(int fd, size_t size, float *ret);
 };
 
 #endif

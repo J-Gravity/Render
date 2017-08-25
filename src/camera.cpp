@@ -1,4 +1,4 @@
-
+#include <SDL.h>
 #include "engine.h"
 
 Camera::Camera(int width, int height, Vector *orig, Matrix *orientation,
