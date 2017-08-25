@@ -1,5 +1,9 @@
 
 #include "engine.h"
+#include <stdio.h>
+#include <SDL.h>
+#include <gl.h>
+#include <glu.h>
 
 static void				grav_exit()
 {
@@ -230,8 +234,8 @@ void					Render::organize_threads(long par)
 
 float					*getBodies(int fd, size_t size, float *ret)
 {
-	if ((size * sizeof(float) * 4) != read(fd, ret, sizeof(float) * size * 4)
-		dprintf(2, "Danger Will Robinson");)
+	if ((size * sizeof(float) * 4) != read(fd, ret, sizeof(float) * size * 4))
+		dprintf(2, "Danger Will Robinson");
 	return (ret);
 }
 
