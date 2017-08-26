@@ -7,6 +7,10 @@
 # include <fcntl.h>
 # include <unistd.h>
 # include <stdio.h>
+# include <SDL.h>
+# include <GL/gl.h>
+# include <GL/glu.h>
+
 
 # define FRAME_COUNT 36
 
@@ -64,7 +68,9 @@ private:
 	void						organize_threads(long par);
 	
 	//my shit
-	void						draw(size_t size, float *bodies);
+	void						draw(size_t size, float *bodies, SDL_Window *screen);
+	void						draw(size_t size, std::queue<float*> *bodies, SDL_Window *screen, size_t *i)
+	void						buffer_frames(void *p);
 	float						*getBodies(int fd, size_t size, float *ret);
 };
 

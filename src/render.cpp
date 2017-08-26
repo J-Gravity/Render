@@ -1,9 +1,10 @@
 
 #include "engine.h"
 #include <stdio.h>
-#include <SDL.h>
-#include <GL/gl.h>
-#include <GL/glu.h>
+#include <render.h>
+#include <pthread.h>
+
+int		frames_buffered = 0;
 
 static void				grav_exit()
 {
@@ -116,7 +117,7 @@ static inline void		h_set_vars(FILE *f, Vector *vec, double &mass)
 }
 
 
-float					*getBodies(int fd, size_t size, float *ret)
+float					*Render::getBodies(int fd, size_t size, float *ret)
 {
 	if ((size * sizeof(float) * 4) != read(fd, ret, sizeof(float) * size * 4))
 		dprintf(2, "Danger Will Robinson");
@@ -124,7 +125,7 @@ float					*getBodies(int fd, size_t size, float *ret)
 }
 
 //the real draw of this file. hon hon hon.
-void					Render::draw(size_t size, float *bodies)
+void					Render::draw(size_t size, float *bodies, SDL_Window *screen)
 {
 	//grab our bodies, the long at the beginning is already filtered out.
 	size_t			i = 0;
@@ -164,222 +165,161 @@ void					Render::draw(size_t size, float *bodies)
 	//we don't need to free our bodies here because we are just going to overwrite it next time.
 }
 
-
-//Pablo doesn't bother commenting his code so I'm just going to overload draw and do something simpler while preserving his code in case we need something from it.
-void					Render::draw(bool first)
+void					Render::draw(size_t size, std::queue<float*> *bodies, SDL_Window *screen, size_t *i)
 {
-	FILE				*fin;
-	FILE				*fout;
-	std::string			name;
-	long				par;
-	int					a, b, c, d;
-	Color				*color;
-	int					max;
+	float			*buf;
+	if(*i < frames_buffered)
+	{
+		SDL_GL_SwapWindow(screen);
+		//no idea what these do aside from setting which matrix I'm using but I know I'm supposed to use them
+		glMatrixMode(GL_PROJECTION);
+		glLoadIdentity();
+		//aspect ratio stuff
+		gluPerspective(70, (double)640/480, 1, 1000);
+	
+		glPushAttrib(GL_ALL_ATTRIB_BITS); //save the state of the OpenGL stuff
+		glPushMatrix();
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glMatrixMode(GL_MODELVIEW);
+		glLoadIdentity();
+	
+		gluLookAt(3, 4, 2, 0, 0, 0, 0, 0, 1); //3d math stuff
+		glPointSize(3.0); //diameter of our points.
+		glBegin(GL_POINTS); //treat all our vertexes as single points
 
-	name = this->in_path + std::to_string(this->tick) + ".jgrav";
-	fin = fopen(name.c_str(), "rb");
-	SDL_SetRenderDrawColor(this->ren, 0, 0, 0, 0);
-	SDL_RenderClear(this->ren);
-	par = h_read_long(fin);
-	// if (first)
-	// 	this->scale = 1000.0 * (double)h_read_long(fin);
-	organize_threads(par);
-	fclose(fin);
-	SDL_mutexP(this->mutex);
-	SDL_CondBroadcast(this->start_cond);
-	SDL_CondWait(this->done_cond, this->mutex);
-	SDL_mutexV(this->mutex);
-	a = 0;
-	b = 0;
-	c = 0;
-	d = 0;
-	for (int off = 0; off < this->pixels.size(); off += 4)
-	{
-		a = this->threads[0]->compix[off / 4];
-		max = a;
-		b = this->threads[1]->compix[off / 4];
-		max = b > max ? b : max;
-		c = this->threads[2]->compix[off / 4];
-		max = c > max ? c : max;
-		d = this->threads[3]->compix[off / 4];
-		max = d > max ? d : max;
-		if (max > 0)
+		buf = bodies->first();
+		for (int j = 0; j < size * 4; j += 4)
 		{
-			color = Color::table[max - 1];
-			this->pixels[off + 0] = color->b;
-			this->pixels[off + 1] = color->g;
-			this->pixels[off + 2] = color->r;
-			this->pixels[off + 3] = SDL_ALPHA_OPAQUE;
-			this->compix[off / 4] = max;
+			glColor3ub((int)buf[j + 3] % 255, 0, 255);
+			glVertex3d(buf[j + 0], buf[j + 1], buf[j + 2]);
 		}
+		free(buf);
+		bodies->pop;
+		*i += 1;
+		glEnd(); //this be straight magic
+		glFlush();
+		SDL_GL_SwapWindow(screen);
+	
+		glPopMatrix();
+		glPopAttrib();
 	}
-	SDL_UpdateTexture(this->tex, NULL, &this->pixels[0], this->width * 4);
-	SDL_RenderCopy(this->ren, this->tex, NULL, NULL);
-	if (this->to_gif)
-	{
-		name = this->out_path + std::to_string(this->tick) + ".jgpix";
-		fout = fopen(name.c_str(), "w");
-		fwrite((const char*)&this->compix[0], this->compix.size(),
-			sizeof(char), fout);
-		fclose(fout);
-	}
-	SDL_RenderPresent(this->ren);
 }
 
-/*static void				h_update_from_input(Render *r, bool *u)
-{
-	bool				update;
 
-	update = false;
-	if (r->keystate[SDL_SCANCODE_W] && (update = true) == true)
-		r->cam->mod_angles(M_PI / 32.0, 0.0, 0.0);
-	if (r->keystate[SDL_SCANCODE_S] && (update = true) == true)
-		r->cam->mod_angles(-M_PI / 32.0, 0.0, 0.0);
-	if (r->keystate[SDL_SCANCODE_A] && (update = true) == true)
-		r->cam->mod_angles(0.0, -M_PI / 32.0, 0.0);
-	if (r->keystate[SDL_SCANCODE_D] && (update = true) == true)
-		r->cam->mod_angles(0.0, M_PI / 32.0, 0.0);
-	if (r->keystate[SDL_SCANCODE_Q] && (update = true) == true)
-		r->cam->mod_angles(0.0, 0.0, -M_PI / 32.0);
-	if (r->keystate[SDL_SCANCODE_E] && (update = true) == true)
-		r->cam->mod_angles(0.0, 0.0, M_PI / 32.0);
-	if (r->keystate[SDL_SCANCODE_UP] && (update = true) == true)
-		r->cam->mod_location(0.0, -r->scale / 200.0, 0.0);
-	if (r->keystate[SDL_SCANCODE_DOWN] && (update = true) == true)
-		r->cam->mod_location(0.0, r->scale / 200.0, 0.0);
-	if (r->keystate[SDL_SCANCODE_LEFT] && (update = true) == true)
-		r->cam->mod_location(-r->scale / 200.0, 0.0, 0.0);
-	if (r->keystate[SDL_SCANCODE_RIGHT] && (update = true) == true)
-		r->cam->mod_location(r->scale / 200.0, 0.0, 0.0);
-	if (update)
-		*u = 0;
-}*/
+//Pablo doesn't bother commenting his code so I'm just going to overload draw and do something simpler while preserving his code in case we need something from it.
 
-void					Render::loop(long start, long end)
+
+typedef struct s_frame_params
 {
-	bool				running;
-	bool				paused;
-	bool				updated;
-	bool				first;
-	int					dir;
-	SDL_Event			event;
-	size_t				size = 0;
+	size_t				*size;
+	std::queue<float*>	*bodies;
+	long				end;
+}				t_frame_params;
+
+void					*Render::buffer_frames(void *p)
+{
+	int					first = 1;
+	int					sub_frames = 0;
 	int					fd;
 	std::string			name;
-	float				**bodies;
-
-	this->tick = start;
-	this->start_tick = start;
-	running = 1;
-	paused = 1;
-	updated = 0;
-	dir = 1;
-	first = true;
-	while (running)
+	float				*frame;
+	float				*buf;
+	float				*prev;
+	size_t				size;
+	t_frame_params		*params = (t_frame_params*)p;
+	
+	name = this->in_path + std::to_string(this->tick) + ".jgrav";
+	fd = open(name.c_str(), O_RDONLY);
+	read(fd, params->size, sizeof(long));
+	size = *(params->size);
+	buf = (float*)malloc(sizeof(float) * size * 4);
+	buf = getBodies(fd, size, buf);
+	close(fd);
+	prev = calloc(size, sizeof(float));
+	//while we have not reached the end tick
+	while (this->tick < params->end)
 	{
-		if (!paused)
+		//buffer sixty frames in advance
+		while (params->bodies->size < 60)
 		{
-			this->tick += dir;
-			updated = 0;
-		}
-		if (this->tick == end || this->tick == 0)
-			paused = 1;
-		if (this->tick < start)
+		if (!first)
 		{
-			updated = 0;
-			this->tick = start;
-		}
-		else if (this->tick > end)
-		{
-			updated = 0;
-			this->tick = end;
-		}
-		if (!updated)
-		{
+			//save our old buf in prev
+			prev = memcpy(prev, buf, size * 4);
 			name = this->in_path + std::to_string(this->tick) + ".jgrav";
 			fd = open(name.c_str(), O_RDONLY);
 			read(fd, &size, sizeof(long));
-			if (first)
-			{
-				//initialize our frames and populate them. Improve this by doing the populating and the rendering in different threads.
-				//Ideally we would populate up to x frames and then start rendering, with the rendering pausing if we outpace the population. We should render multiple frames of the simulation intot the future. There should be a way to set a framerate as well.
-				//doing it this way makes a lot of sense if you actually think about what malloc does
-				bodies = (float**)malloc(sizeof(float*) * FRAME_COUNT);
-				for (size_t j = 0; j < FRAME_COUNT; j++)
-				{
-					bodies[j] = (float*)malloc(sizeof(float) * size * 4);
-					bodies[j] = getBodies(fd, size, bodies[j]);
-				}
-				for (size_t j = 0; j < FRAME_COUNT; j++)
-				{
-					this->draw(size, bodies[j]);
-					first = false;
-				}
-			}
-			else
-			{
-				for (size_t j = 0; j < FRAME_COUNT; j++)
-				{
-					bodies[j] = getBodies(fd, size, bodies[j]);
-				}
-				for (size_t j = 0; j < FRAME_COUNT; j++)
-				{
-					this->draw(size, bodies[j]);
-				}
-			}
+			//get our new buf
+			buf = getBodies(fd, size, buf);
 			close(fd);
-			updated = 1;
 		}
-		while (SDL_PollEvent(&event))
+		first = 0;
+		sub_frames = 1;
+		while (sub_frames < FRAME_COUNT + 1)
 		{
-			switch (event.type)
+			frame = (float*)malloc(sizeof(float) * size * 4);
+			for (int j = 0; j < size * 4; j += 4)
 			{
-				case SDL_QUIT:
-					running = 0;
-					break;
-				case SDL_KEYDOWN:
-					switch (event.key.keysym.sym)
-					{
-						case SDLK_ESCAPE:
-							running = 0;
-							break;
-						case SDLK_SPACE:
-							paused = !paused;
-							break;
-						case SDLK_b:
-							if (this->tick > start)
-								this->tick--;
-							updated = 0;
-							break;
-						case SDLK_n:
-							if (this->tick < end)
-								this->tick++;
-							updated = 0;
-							break;
-						case SDLK_m:
-							this->tick = start;
-							updated = 0;
-							break;
-						case SDLK_r:
-							dir *= -1;
-							break;
-						default:
-							break;
-					}
-					break;
-				case SDL_MOUSEWHEEL:
-					if (event.wheel.y < 0)
-						this->scale *= 1.1;
-					else if (event.wheel.y > 0)
-						this->scale /= 1.1;
-					updated = 0;
-					break;
+				//create new frames that transition between the previous tick and this tick in 36 steps.
+				if (buf[j + 0] < prev[j + 0])
+					frame[j + 0] = prev[j + 0] - (((prev[j + 0] - buf[j + 0])/FRAME_COUNT) * sub_frames);
+				else
+					frame[j + 0] = prev[j + 0] + (((buf[j + 0] - prev[j + 0])/FRAME_COUNT) * sub_frames);
+				if (buf[j + 1] < prev[j + 1])
+					frame[j + 1] = prev[j + 1] - (((prev[j + 1] - buf[j + 1])/FRAME_COUNT) * sub_frames);
+				else
+					frame[j + 1] = prev[j + 1] + (((buf[j + 1] - prev[j + 1])/FRAME_COUNT) * sub_frames);
+				if (buf[j + 2] < prev[j + 2])
+					frame[j + 2] = prev[j + 2] - (((prev[j + 2] - buf[j + 2])/FRAME_COUNT) * sub_frames);
+				else
+					frame[j + 2] = prev[j + 2] + (((buf[j + 2] - prev[j + 2])/FRAME_COUNT) * sub_frames);
+				frame[j + 3] = buf[j + 3];
 			}
+			//put the new frame at the end of our vector and increment the buffered frames count
+			params->bodies->push(frame);
+			sub_frames++;
+			frames_buffered++;
 		}
-		this->keystate = (Uint8*)SDL_GetKeyboardState(NULL);
-		//h_update_from_input(this, &updated);
+		//go to the next file
+		this->tick++;
+		}
 	}
-	this->end_tick = this->tick;
+}
+
+
+void					Render::loop(long start, long end)
+{
+	size_t				size = 0;
+	std::queue<float*>	bodies = new std::queue<float*>;
+	t_frame_params		params;
+	size_t				i = 0;
+
+	this->tick = start;
+	this->start_tick = start;
+	
+	//make our window
+	SDL_Window *screen = SDL_CreateWindow("My Window",
+                          SDL_WINDOWPOS_UNDEFINED,
+                          SDL_WINDOWPOS_UNDEFINED,
+                          720, 680,
+                          SDL_WINDOW_FULLSCREEN | SDL_WINDOW_OPENGL);
+	SDL_GL_CreateContext(screen);
+	SDL_GL_SwapWindow(screen);
+	
+	//I know I don't have to use a param struct for this but it feels cleaner
+	params.size = &size;
+	params.bodies = bodies;
+	params.end = end;
+	
+	std::thread			thread(buffer_frames, &params);
+	thread.detach();
+	sleep(2); //give it some time to pre-buffer.
+	while (1)
+	{
+		this->draw(size, &bodies, screen, &i);
+	}
+	//the thread will never finish executing in the current implentation
+	thread.join();
 }
 
 void					Render::wait_for_death()
