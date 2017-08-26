@@ -5,8 +5,8 @@ SRC		= main.cpp render.cpp
 OBJ		= $(addprefix $(OBJDIR),$(SRC:.cpp=.o))
 
 CC		= clang++
-CGLAGS	= -std=c++11 -O3 -I /frameworks/SDL2.framework/Headers/ -I /usr/include/SDL2/
-LDFLAGS	= -I usr/include/SDL2/
+CGLAGS	= -std=c++11 -pthread -O3 -I /frameworks/SDL2.framework/Headers/ -I /usr/include/SDL2/
+LDFLAGS	= -std=c++11 -pthread -I usr/include/SDL2/
 
 SRCDIR	= ./src/
 INCDIR	= ./includes/

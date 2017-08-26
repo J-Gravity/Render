@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <render.h>
 #include <pthread.h>
+#include <queue>
 
 int		frames_buffered = 0;
 
@@ -187,14 +188,14 @@ void					Render::draw(size_t size, std::queue<float*> *bodies, SDL_Window *scree
 		glPointSize(3.0); //diameter of our points.
 		glBegin(GL_POINTS); //treat all our vertexes as single points
 
-		buf = bodies->first();
+		buf = bodies->front();
 		for (int j = 0; j < size * 4; j += 4)
 		{
 			glColor3ub((int)buf[j + 3] % 255, 0, 255);
 			glVertex3d(buf[j + 0], buf[j + 1], buf[j + 2]);
 		}
 		free(buf);
-		bodies->pop;
+		bodies->pop();
 		*i += 1;
 		glEnd(); //this be straight magic
 		glFlush();
@@ -216,7 +217,7 @@ typedef struct s_frame_params
 	long				end;
 }				t_frame_params;
 
-void					*Render::buffer_frames(void *p)
+void					Render::buffer_frames(void *p)
 {
 	int					first = 1;
 	int					sub_frames = 0;
@@ -235,17 +236,17 @@ void					*Render::buffer_frames(void *p)
 	buf = (float*)malloc(sizeof(float) * size * 4);
 	buf = getBodies(fd, size, buf);
 	close(fd);
-	prev = calloc(size, sizeof(float));
+	prev = (float*)calloc(size, sizeof(float));
 	//while we have not reached the end tick
 	while (this->tick < params->end)
 	{
 		//buffer sixty frames in advance
-		while (params->bodies->size < 60)
+		while (params->bodies->size() < 60)
 		{
 		if (!first)
 		{
 			//save our old buf in prev
-			prev = memcpy(prev, buf, size * 4);
+			prev = (float*)memcpy(prev, buf, size * 4);
 			name = this->in_path + std::to_string(this->tick) + ".jgrav";
 			fd = open(name.c_str(), O_RDONLY);
 			read(fd, &size, sizeof(long));
@@ -290,7 +291,7 @@ void					*Render::buffer_frames(void *p)
 void					Render::loop(long start, long end)
 {
 	size_t				size = 0;
-	std::queue<float*>	bodies = new std::queue<float*>;
+	std::queue<float*>	*bodies = new std::queue<float*>;
 	t_frame_params		params;
 	size_t				i = 0;
 
@@ -311,12 +312,12 @@ void					Render::loop(long start, long end)
 	params.bodies = bodies;
 	params.end = end;
 	
-	std::thread			thread(buffer_frames, &params);
+	std::thread			thread(&Render::buffer_frames, this, &params);
 	thread.detach();
 	sleep(2); //give it some time to pre-buffer.
 	while (1)
 	{
-		this->draw(size, &bodies, screen, &i);
+		this->draw(size, bodies, screen, &i);
 	}
 	//the thread will never finish executing in the current implentation
 	thread.join();
