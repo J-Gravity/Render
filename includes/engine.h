@@ -8,8 +8,8 @@
 # include <chrono>
 # include <stdio.h>
 # include <stdlib.h>
-# include <SDL.h>
-# include <SDL_thread.h>
+# include <SDL2/SDL.h>
+# include <SDL2/SDL_thread.h>
 # include <vector>
 # include <string>
 # include <map>

@@ -13,7 +13,7 @@ INCDIR	= ./includes/
 OBJDIR	= ./obj/
 
 all: obj
-	clang++ -o render src/render.cpp src/main.cpp `sdl2-config --cflags --libs` -I includes -pthread -std=c++11
+	g++ -std=c++11 -lGL -lGLU -lglut -pthread src/main.cpp src/render.cpp -I /usr/local/includes -I includes/ -lSDL2 -o render
 
 obj:
 	mkdir -p $(OBJDIR)

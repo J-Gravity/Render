@@ -7,7 +7,7 @@
 # include <fcntl.h>
 # include <unistd.h>
 # include <stdio.h>
-# include <SDL.h>
+# include <SDL2/SDL.h>
 # include <GL/gl.h>
 # include <GL/glu.h>
 # include <queue>
