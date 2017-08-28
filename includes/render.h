@@ -7,9 +7,9 @@
 # include <fcntl.h>
 # include <unistd.h>
 # include <stdio.h>
-# include <SDL2/SDL.h>
-# include <GL/gl.h>
-# include <GL/glu.h>
+# include <SDL.h>
+# include <OpenGL/gl.h>
+# include <OpenGL/glu.h>
 # include <queue>
 
 # define FRAME_COUNT 36
