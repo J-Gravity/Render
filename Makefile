@@ -13,7 +13,7 @@ INCDIR	= ./includes/
 OBJDIR	= ./obj/
 
 all: obj
-	g++ -std=c++11 -lGL -lGLU -lglut -pthread src/main.cpp src/render.cpp -I /usr/local/includes -I includes/ -lSDL2 -o render
+	g++ -L /usr/local/lib -std=c++11 -lGL -lGLU -lglut -pthread src/main.cpp src/render.cpp -I /usr/local/includes -I includes/ -lSDL2 -o render
 
 obj:
 	mkdir -p $(OBJDIR)

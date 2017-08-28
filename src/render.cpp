@@ -36,20 +36,7 @@ Render::Render(int w, int h, std::string in, std::string out, int excl)
 	this->out_path = out;
 	this->scale = 2000000000000000.0;
 	this->excl = excl;
-	check_error(!SDL_Init(SDL_INIT_EVERYTHING), "SDL Init error\n");
-	this->win = SDL_CreateWindow("J-Gravity", SDL_WINDOWPOS_UNDEFINED,
-		SDL_WINDOWPOS_UNDEFINED, w, h, SDL_WINDOW_SHOWN);
-	check_error(this->win, "SDL Window creation error\n");
-	this->ren = SDL_CreateRenderer(this->win, -1, SDL_RENDERER_ACCELERATED
-		| SDL_RENDERER_PRESENTVSYNC);
-	check_error(this->ren, "SDL Render create error\n");
-	this->cam = new Camera(this->width, this->width,
-		new Vector(0, 0, 0.0), new Matrix(ROTATION, 0.0, 0.0, 0.0),
-		60, 1000.0, 500000.0);
 	this->tick = 0;
-	Color::set_range(-4.0, 4.0);
-	Color::init_color_table(RAINBOW, 255);
-	init_threading();
 }
 
 static inline long		h_read_long(FILE *f)
