@@ -113,52 +113,13 @@ float					*Render::getBodies(int fd, size_t size, float *ret)
 }
 
 //the real draw of this file. hon hon hon.
-void					Render::draw(size_t size, float *bodies, SDL_Window *screen)
-{
-	//grab our bodies, the long at the beginning is already filtered out.
-	size_t			i = 0;
-	
-	SDL_GL_SwapWindow(screen);
-	//no idea what these do aside from setting which matrix I'm using but I know I'm supposed to use them
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	//aspect ratio stuff
-	gluPerspective(70, (double)640/480, 1, 1000);
-	
-	glPushAttrib(GL_ALL_ATTRIB_BITS); //save the state of the OpenGL stuff
-	glPushMatrix();
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
-	
-	gluLookAt(3, 4, 2, 0, 0, 0, 0, 0, 1); //3d math stuff
-	glPointSize(3.0); //diameter of our points.
-	glBegin(GL_POINTS); //treat all our vertexes as single points.
-	//this works because 64 bits is really really big. Also like realistically speaking I'd be surprised if we broke 1 billion bodies, considering we are only rendering the centers of gravity of the tree's leaves.
-	size = size * 4;
-	while (i < size)
-	{
-		//I don't know how to scale colors.
-		glColor3ub((int)(bodies[i + 3]) % 255, (int)(bodies[i + 3]) % 255, (int)(bodies[i + 3]) % 255);
-		//and then put the bodies in as points
-		glVertex3d(bodies[i + 0], bodies[i + 1], bodies[i + 2]);
-		i += 4;
-	}
-	glEnd(); //this be straight magic
-	glFlush();
-	SDL_GL_SwapWindow(screen);
-	
-	glPopMatrix();
-	glPopAttrib();
-	//we don't need to free our bodies here because we are just going to overwrite it next time.
-}
 
 void					Render::draw(size_t size, std::queue<float*> *bodies, SDL_Window *screen, size_t *i)
 {
 	float			*buf;
 	if(*i < frames_buffered)
 	{
-		SDL_GL_SwapWindow(screen);
+		//SDL_GL_SwapWindow(screen);
 		//no idea what these do aside from setting which matrix I'm using but I know I'm supposed to use them
 		glMatrixMode(GL_PROJECTION);
 		glLoadIdentity();
@@ -179,7 +140,7 @@ void					Render::draw(size_t size, std::queue<float*> *bodies, SDL_Window *scree
 		for (int j = 0; j < size * 4; j += 4)
 		{
 			glColor3ub((int)buf[j + 3] % 255, 0, 255);
-			glVertex3d(buf[j + 0], buf[j + 1], buf[j + 2]);
+			glVertex3d(buf[j + 0] / 10000, buf[j + 1] / 10000, buf[j + 2] / 10000);
 		}
 		free(buf);
 		bodies->pop();
@@ -288,7 +249,7 @@ void					Render::loop(long start, long end)
                           720, 680,
                           SDL_WINDOW_OPENGL);
 	SDL_GL_CreateContext(screen);
-	SDL_GL_SwapWindow(screen);
+	//SDL_GL_SwapWindow(screen);
 
 	//I know I don't have to use a param struct for this but it feels cleaner
 	params.size = &size;
