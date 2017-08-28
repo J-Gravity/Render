@@ -6,7 +6,7 @@ OBJ		= $(addprefix $(OBJDIR),$(SRC:.cpp=.o))
 
 CC		= clang++
 CGLAGS	= -std=c++11 -pthread -O3 -I /usr/local/include/sdl -L /usr/local/lib
-LDFLAGS	= -Wl -rpath ./frameworks/ -F ./frameworks/ -framework SDL2
+LDFLAGS	= -Wl -rpath ./frameworks/ -F ./frameworks/ -framework SDL2 -framework OpenGL
 
 SRCDIR	= ./src/
 INCDIR	= ./includes/

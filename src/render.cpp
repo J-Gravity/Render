@@ -36,20 +36,7 @@ Render::Render(int w, int h, std::string in, std::string out, int excl)
 	this->out_path = out;
 	this->scale = 2000000000000000.0;
 	this->excl = excl;
-	check_error(!SDL_Init(SDL_INIT_EVERYTHING), "SDL Init error\n");
-	this->win = SDL_CreateWindow("J-Gravity", SDL_WINDOWPOS_UNDEFINED,
-		SDL_WINDOWPOS_UNDEFINED, w, h, SDL_WINDOW_SHOWN);
-	check_error(this->win, "SDL Window creation error\n");
-	this->ren = SDL_CreateRenderer(this->win, -1, SDL_RENDERER_ACCELERATED
-		| SDL_RENDERER_PRESENTVSYNC);
-	check_error(this->ren, "SDL Render create error\n");
-	this->cam = new Camera(this->width, this->width,
-		new Vector(0, 0, 0.0), new Matrix(ROTATION, 0.0, 0.0, 0.0),
-		60, 1000.0, 500000.0);
 	this->tick = 0;
-	Color::set_range(-4.0, 4.0);
-	Color::init_color_table(RAINBOW, 255);
-	init_threading();
 }
 
 static inline long		h_read_long(FILE *f)
@@ -206,10 +193,6 @@ void					Render::draw(size_t size, std::queue<float*> *bodies, SDL_Window *scree
 	}
 }
 
-
-//Pablo doesn't bother commenting his code so I'm just going to overload draw and do something simpler while preserving his code in case we need something from it.
-
-
 typedef struct s_frame_params
 {
 	size_t				*size;
@@ -303,10 +286,10 @@ void					Render::loop(long start, long end)
                           SDL_WINDOWPOS_UNDEFINED,
                           SDL_WINDOWPOS_UNDEFINED,
                           720, 680,
-                          SDL_WINDOW_FULLSCREEN | SDL_WINDOW_OPENGL);
+                          SDL_WINDOW_OPENGL);
 	SDL_GL_CreateContext(screen);
 	SDL_GL_SwapWindow(screen);
-	
+
 	//I know I don't have to use a param struct for this but it feels cleaner
 	params.size = &size;
 	params.bodies = bodies;
@@ -317,8 +300,15 @@ void					Render::loop(long start, long end)
 	sleep(2); //give it some time to pre-buffer.
 	while (1)
 	{
+		if (i < frames_buffered)
+		{
+			printf("debug\n");
 		this->draw(size, bodies, screen, &i);
+		}
+		printf("out\n");
 	}
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
 	//the thread will never finish executing in the current implentation
 	thread.join();
 }
